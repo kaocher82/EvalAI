@@ -164,9 +164,7 @@ class Challenge(TimeStampedModel):
     @property
     def is_active(self):
         """Returns if the challenge is active or not"""
-        if self.start_date < timezone.now() and self.end_date > timezone.now():
-            return True
-        return False
+        return self.start_date < timezone.now() and self.end_date > timezone.now()
 
 
 signals.post_save.connect(
@@ -182,14 +180,17 @@ signals.post_save.connect(
 def create_eks_cluster_for_challenge(sender, instance, created, **kwargs):
     field_name = "approved_by_admin"
 
-    if not created and is_model_field_changed(instance, field_name):
-        if (
+    if (
+        not created
+        and is_model_field_changed(instance, field_name)
+        and (
             instance.approved_by_admin is True
             and instance.is_docker_based is True
             and instance.remote_evaluation is False
-        ):
-            serialized_obj = serializers.serialize("json", [instance])
-            create_eks_cluster.delay(serialized_obj)
+        )
+    ):
+        serialized_obj = serializers.serialize("json", [instance])
+        create_eks_cluster.delay(serialized_obj)
     challenge_approval_callback(sender, instance, field_name, **kwargs)
 
 
@@ -284,9 +285,7 @@ class ChallengePhase(TimeStampedModel):
     @property
     def is_active(self):
         """Returns if the challenge is active or not"""
-        if self.start_date < timezone.now() and self.end_date > timezone.now():
-            return True
-        return False
+        return self.start_date < timezone.now() and self.end_date > timezone.now()
 
     def save(self, *args, **kwargs):
 
@@ -299,10 +298,9 @@ class ChallengePhase(TimeStampedModel):
                 self.max_submissions_per_day
             )
 
-        challenge_phase_instance = super(ChallengePhase, self).save(
+        return super(ChallengePhase, self).save(
             *args, **kwargs
         )
-        return challenge_phase_instance
 
 
 signals.post_save.connect(

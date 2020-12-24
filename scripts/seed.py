@@ -49,13 +49,10 @@ def check_database():
         print(
             "Are you sure you want to wipe the existing development database and reseed it? (Y/N)"
         )
-        if settings.TEST or input().lower() == "y":
-            destroy_database()
-            return True
-        else:
+        if not settings.TEST and input().lower() != "y":
             return False
-    else:
-        return True
+        destroy_database()
+    return True
 
 
 def destroy_database():
@@ -318,14 +315,13 @@ def create_leaderboard():
 
 def create_leaderboard_data(challenge_phase_split, submission):
     result = {"score": random.randint(1, 100)}
-    leaderboard_data = LeaderboardData.objects.create(
+    return LeaderboardData.objects.create(
         challenge_phase_split=challenge_phase_split,
         submission=submission,
         leaderboard=challenge_phase_split.leaderboard,
         result=result,
         error=None,
     )
-    return leaderboard_data
 
 
 def create_dataset_splits(number_of_splits):

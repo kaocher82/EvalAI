@@ -93,15 +93,14 @@ def challenge_host_team_detail(request, pk):
                 data=request.data,
                 context={"request": request},
             )
-        if serializer.is_valid():
-            serializer.save()
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
+        if not serializer.is_valid():
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+        serializer.save()
+        response_data = serializer.data
+        return Response(response_data, status=status.HTTP_200_OK)
     elif request.method == "DELETE":
         challenge_host_team.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -196,15 +195,14 @@ def challenge_host_detail(request, challenge_host_team_pk, pk):
                     "request": request,
                 },
             )
-        if serializer.is_valid():
-            serializer.save()
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
+        if not serializer.is_valid():
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+        serializer.save()
+        response_data = serializer.data
+        return Response(response_data, status=status.HTTP_200_OK)
     elif request.method == "DELETE":
         challenge_host.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

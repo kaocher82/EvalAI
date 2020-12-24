@@ -44,11 +44,7 @@ def get_missing_keys_from_dict(dictionary, keys):
     Returns:
     list: A list of keys missing from the dictionary object.
     """
-    missing_keys = []
-    for key in keys:
-        if key not in dictionary.keys():
-            missing_keys.append(key)
-    return missing_keys
+    return [key for key in keys if key not in dictionary.keys()]
 
 
 def get_file_content(file_path, mode):
@@ -58,8 +54,7 @@ def get_file_content(file_path, mode):
 
 
 def read_file_data_as_content_file(file_path, mode, name):
-    content_file = ContentFile(get_file_content(file_path, mode), name)
-    return content_file
+    return ContentFile(get_file_content(file_path, mode), name)
 
 
 def convert_to_aws_ecr_compatible_format(string):
@@ -84,11 +79,9 @@ def convert_to_aws_federated_user_format(string):
         string -- Valid ECR repository name
     """
     string = string.replace(" ", "-")
-    result = ""
-    for ch in string:
-        if ch.isalnum() or ch in ["=", ",", ".", "@", "-"]:
-            result += ch
-    return result
+    return "".join(
+        ch for ch in string if ch.isalnum() or ch in ["=", ",", ".", "@", "-"]
+    )
 
 
 def get_aws_credentials_for_challenge(challenge_pk):
@@ -101,21 +94,20 @@ def get_aws_credentials_for_challenge(challenge_pk):
     """
     challenge = get_challenge_model(challenge_pk)
     if challenge.use_host_credentials:
-        aws_keys = {
+        return {
             "AWS_ACCOUNT_ID": challenge.aws_account_id,
             "AWS_ACCESS_KEY_ID": challenge.aws_access_key_id,
             "AWS_SECRET_ACCESS_KEY": challenge.aws_secret_access_key,
             "AWS_REGION": challenge.aws_region,
         }
     else:
-        aws_keys = {
+        return {
             "AWS_ACCOUNT_ID": settings.AWS_ACCOUNT_ID,
             "AWS_ACCESS_KEY_ID": settings.AWS_ACCESS_KEY_ID,
             "AWS_SECRET_ACCESS_KEY": settings.AWS_SECRET_ACCESS_KEY,
             "AWS_REGION": settings.AWS_REGION,
             "AWS_STORAGE_BUCKET_NAME": settings.AWS_STORAGE_BUCKET_NAME,
         }
-    return aws_keys
 
 
 def generate_presigned_url(file_key_on_s3, challenge_pk):
@@ -181,10 +173,10 @@ def get_or_create_ecr_repository(name, aws_keys):
         )
         repository = response["repositories"][0]
     except ClientError as e:
-        if (
-            e.response["Error"]["Code"] == "RepositoryNotFoundException"
-            or e.response["Error"]["Code"] == "400"
-        ):
+        if e.response["Error"]["Code"] in [
+            "RepositoryNotFoundException",
+            "400",
+        ]:
             response = client.create_repository(repositoryName=name)
             repository = response["repository"]
             created = True
@@ -248,12 +240,11 @@ def create_federated_user(name, repository, aws_keys):
         ],
     }
     client = get_boto3_client("sts", aws_keys)
-    response = client.get_federation_token(
+    return client.get_federation_token(
         Name=convert_to_aws_federated_user_format(name),
         Policy=json.dumps(policy),
         DurationSeconds=43200,
     )
-    return response
 
 
 @mock_if_non_prod_aws(mock_ecr)
@@ -294,10 +285,10 @@ def get_aws_credentials_for_submission(challenge, participant_team):
 
 def is_user_in_allowed_email_domains(email, challenge_pk):
     challenge = get_challenge_model(challenge_pk)
-    for domain in challenge.allowed_email_domains:
-        if domain.lower() in email.lower():
-            return True
-    return False
+    return any(
+        domain.lower() in email.lower()
+        for domain in challenge.allowed_email_domains
+    )
 
 
 def is_user_in_blocked_email_domains(email, challenge_pk):
@@ -318,8 +309,6 @@ def get_unique_alpha_numeric_key(length):
             key {string} -- unique alpha numeric key of length
     """
     return "".join(
-        [
-            random.choice(string.ascii_letters + string.digits)
-            for i in range(length)
-        ]
+        random.choice(string.ascii_letters + string.digits)
+        for i in range(length)
     )

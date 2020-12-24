@@ -141,15 +141,14 @@ def participant_team_detail(request, pk):
                 data=request.data,
                 context={"request": request},
             )
-        if serializer.is_valid():
-            serializer.save()
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
+        if not serializer.is_valid():
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+        serializer.save()
+        response_data = serializer.data
+        return Response(response_data, status=status.HTTP_200_OK)
     elif request.method == "DELETE":
         participant_team.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -239,17 +238,20 @@ def invite_participant_to_team(request, pk):
                     )
 
             # Check if user is in allowed list.
-            if len(challenge.allowed_email_domains) > 0:
-                if not is_user_in_allowed_email_domains(email, challenge_pk):
-                    message = "Sorry, users with {} email domain(s) are only allowed to participate in this challenge."
-                    domains = ""
-                    for domain in challenge.allowed_email_domains:
-                        domains = "{}{}{}".format(domains, "/", domain)
-                    domains = domains[1:]
-                    response_data = {"error": message.format(domains)}
-                    return Response(
-                        response_data, status=status.HTTP_406_NOT_ACCEPTABLE
-                    )
+            if len(
+                challenge.allowed_email_domains
+            ) > 0 and not is_user_in_allowed_email_domains(
+                email, challenge_pk
+            ):
+                message = "Sorry, users with {} email domain(s) are only allowed to participate in this challenge."
+                domains = ""
+                for domain in challenge.allowed_email_domains:
+                    domains = "{}{}{}".format(domains, "/", domain)
+                domains = domains[1:]
+                response_data = {"error": message.format(domains)}
+                return Response(
+                    response_data, status=status.HTTP_406_NOT_ACCEPTABLE
+                )
 
             # Check if user is in blocked list.
             if is_user_in_blocked_email_domains(email, challenge_pk):

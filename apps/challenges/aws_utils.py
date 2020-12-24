@@ -321,9 +321,7 @@ def client_token_generator(challenge_pk):
     random_char_string = "".join(
         random.choices(string.ascii_letters + string.digits, k=remaining_chars)
     )
-    client_token = f"{str(challenge_pk)}{random_char_string}"
-
-    return client_token
+    return f"{str(challenge_pk)}{random_char_string}"
 
 
 def register_task_def_by_challenge_pk(client, queue_name, challenge):
@@ -544,16 +542,13 @@ def service_manager(
     dict: The response returned by the respective functions update_service_by_challenge_pk or create_service_by_challenge_pk
     """
     if challenge.workers is not None:
-        response = update_service_by_challenge_pk(
+        return update_service_by_challenge_pk(
             client, challenge, num_of_tasks, force_new_deployment
         )
-        return response
-    else:
-        client_token = client_token_generator(challenge.pk)
-        response = create_service_by_challenge_pk(
+    client_token = client_token_generator(challenge.pk)
+    return create_service_by_challenge_pk(
             client, challenge, client_token
         )
-        return response
 
 
 def start_workers(queryset):
@@ -570,14 +565,14 @@ def start_workers(queryset):
                  'failures': a dict of all the failures with their error messages and the challenge pk
     """
     if settings.DEBUG:
-        failures = []
-        for challenge in queryset:
-            failures.append(
-                {
-                    "message": "Workers cannot be started on AWS ECS service in development environment",
-                    "challenge_pk": challenge.pk,
-                }
-            )
+        failures = [
+            {
+                "message": "Workers cannot be started on AWS ECS service in development environment",
+                "challenge_pk": challenge.pk,
+            }
+            for challenge in queryset
+        ]
+
         return {"count": 0, "failures": failures}
 
     client = get_boto3_client("ecs", aws_keys)
@@ -619,14 +614,14 @@ def stop_workers(queryset):
                  'failures': a dict of all the failures with their error messages and the challenge pk
     """
     if settings.DEBUG:
-        failures = []
-        for challenge in queryset:
-            failures.append(
-                {
-                    "message": "Workers cannot be stopped on AWS ECS service in development environment",
-                    "challenge_pk": challenge.pk,
-                }
-            )
+        failures = [
+            {
+                "message": "Workers cannot be stopped on AWS ECS service in development environment",
+                "challenge_pk": challenge.pk,
+            }
+            for challenge in queryset
+        ]
+
         return {"count": 0, "failures": failures}
 
     client = get_boto3_client("ecs", aws_keys)
@@ -668,14 +663,14 @@ def scale_workers(queryset, num_of_tasks):
                  'failures': a dict of all the failures with their error messages and the challenge pk
     """
     if settings.DEBUG:
-        failures = []
-        for challenge in queryset:
-            failures.append(
-                {
-                    "message": "Workers cannot be scaled on AWS ECS service in development environment",
-                    "challenge_pk": challenge.pk,
-                }
-            )
+        failures = [
+            {
+                "message": "Workers cannot be scaled on AWS ECS service in development environment",
+                "challenge_pk": challenge.pk,
+            }
+            for challenge in queryset
+        ]
+
         return {"count": 0, "failures": failures}
 
     client = get_boto3_client("ecs", aws_keys)
@@ -722,14 +717,14 @@ def delete_workers(queryset):
                  'failures': a dict of all the failures with their error messages and the challenge pk
     """
     if settings.DEBUG:
-        failures = []
-        for challenge in queryset:
-            failures.append(
-                {
-                    "message": "Workers cannot be deleted on AWS ECS service in development environment",
-                    "challenge_pk": challenge.pk,
-                }
-            )
+        failures = [
+            {
+                "message": "Workers cannot be deleted on AWS ECS service in development environment",
+                "challenge_pk": challenge.pk,
+            }
+            for challenge in queryset
+        ]
+
         return {"count": 0, "failures": failures}
 
     count = 0
@@ -768,14 +763,14 @@ def restart_workers(queryset):
                  'failures': a dict of all the failures with their error messages and the challenge pk
     """
     if settings.DEBUG:
-        failures = []
-        for challenge in queryset:
-            failures.append(
-                {
-                    "message": "Workers cannot be restarted on AWS ECS service in development environment",
-                    "challenge_pk": challenge.pk,
-                }
-            )
+        failures = [
+            {
+                "message": "Workers cannot be restarted on AWS ECS service in development environment",
+                "challenge_pk": challenge.pk,
+            }
+            for challenge in queryset
+        ]
+
         return {"count": 0, "failures": failures}
 
     client = get_boto3_client("ecs", aws_keys)
@@ -824,11 +819,7 @@ def restart_workers_signal_callback(sender, instance, field_name, **kwargs):
 
     if prev != curr:
         challenge = None
-        if field_name == "test_annotation":
-            challenge = instance.challenge
-        else:
-            challenge = instance
-
+        challenge = instance.challenge if field_name == "test_annotation" else instance
         response = restart_workers([challenge])
 
         count, failures = response["count"], response["failures"]
@@ -853,11 +844,11 @@ def restart_workers_signal_callback(sender, instance, field_name, **kwargs):
                 settings.HOSTNAME, challenge.id
             )
 
-            if field_name == "test_annotation":
-                file_updated = "Test Annotation"
-            elif field_name == "evaluation_script":
+            if field_name == "evaluation_script":
                 file_updated = "Evaluation script"
 
+            elif field_name == "test_annotation":
+                file_updated = "Test Annotation"
             template_data = {
                 "CHALLENGE_NAME": challenge.title,
                 "CHALLENGE_MANAGE_URL": challenge_manage_url,
@@ -966,8 +957,8 @@ def create_eks_cluster(challenge):
 
     for obj in serializers.deserialize("json", challenge):
         challenge_obj = obj.object
-    cluster_name = "{0}-cluster".format(challenge_obj.title.replace(" ", "-"))
     if challenge_obj.approved_by_admin and challenge_obj.is_docker_based:
+        cluster_name = "{0}-cluster".format(challenge_obj.title.replace(" ", "-"))
         client = get_boto3_client("eks", aws_keys)
         try:
             response = client.create_cluster(

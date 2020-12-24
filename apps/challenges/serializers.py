@@ -309,10 +309,9 @@ class StarChallengeSerializer(serializers.ModelSerializer):
         fields = ("user", "challenge", "count", "is_starred")
 
     def get_count(self, obj):
-        count = StarChallenge.objects.filter(
+        return StarChallenge.objects.filter(
             challenge=obj.challenge, is_starred=True
         ).count()
-        return count
 
 
 class UserInvitationSerializer(serializers.ModelSerializer):

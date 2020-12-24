@@ -2489,8 +2489,7 @@ class UpdateSubmissionTest(BaseAPITestClass):
                 ]
             ),
         }
-        malformed_metrics = []
-        malformed_metrics.append(("metric1", type("60")))
+        malformed_metrics = [("metric1", type("60"))]
         expected = {
             "error": "Values for following metrics are not of"
             "float/int: {}".format(malformed_metrics)

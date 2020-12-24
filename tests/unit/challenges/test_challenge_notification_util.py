@@ -97,17 +97,12 @@ class TestChallengeStartNotifier(BaseTestClass):
         template_id = settings.SENDGRID_SETTINGS.get("TEMPLATES").get("CHALLENGE_APPROVAL_EMAIL")
         template_data = {"CHALLENGE_NAME": self.challenge.title, "CHALLENGE_URL": challenge_url}
 
-        calls = []
-        for email in host_emails:
-            calls.append(
-                mock.call(
+        calls = [mock.call(
                     sender=settings.CLOUDCV_TEAM_EMAIL,
                     recipient=email,
                     template_id=template_id,
                     template_data=template_data,
-                )
-            )
-
+                ) for email in host_emails]
         mock_start_workers.return_value = {"count": 1, "failures": []}
 
         self.challenge.approved_by_admin = True
