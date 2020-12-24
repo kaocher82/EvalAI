@@ -163,8 +163,7 @@ def get_api_object(cluster_name, cluster_endpoint, challenge, evalai):
         "aws_eks_bearer_token"
     ]
     configuration.api_key_prefix["authorization"] = "Bearer"
-    api_instance = client.BatchV1Api(client.ApiClient(configuration))
-    return api_instance
+    return client.BatchV1Api(client.ApiClient(configuration))
 
 
 def get_api_client(cluster_name, cluster_endpoint, challenge, evalai):
@@ -177,8 +176,7 @@ def get_api_client(cluster_name, cluster_endpoint, challenge, evalai):
         "aws_eks_bearer_token"
     ]
     configuration.api_key_prefix["authorization"] = "Bearer"
-    api_instance = client.ApiClient(configuration)
-    return api_instance
+    return client.ApiClient(configuration)
 
 
 def get_core_v1_api_object(cluster_name, cluster_endpoint, challenge, evalai):
@@ -191,8 +189,7 @@ def get_core_v1_api_object(cluster_name, cluster_endpoint, challenge, evalai):
         "aws_eks_bearer_token"
     ]
     configuration.api_key_prefix["authorization"] = "Bearer"
-    api_instance = client.CoreV1Api(client.ApiClient(configuration))
-    return api_instance
+    return client.CoreV1Api(client.ApiClient(configuration))
 
 
 def get_running_jobs(api_instance):
@@ -239,36 +236,38 @@ def update_failed_jobs_and_send_logs(
         timeout_seconds=10,
     )
     for container in pods_list.items[0].status.container_statuses:
-        if container.name == "agent":
-            if container.state.terminated is not None:
-                if container.state.terminated.reason == "Error":
-                    pod_name = pods_list.items[0].metadata.name
-                    try:
-                        pod_log_response = core_v1_api_instance.read_namespaced_pod_log(
-                            name=pod_name,
-                            namespace="default",
-                            _return_http_data_only=True,
-                            _preload_content=False,
-                            container="agent",
-                        )
-                        pod_log = pod_log_response.data.decode("utf-8")
-                        submission_data = {
-                            "challenge_phase": phase_pk,
-                            "submission": submission_pk,
-                            "stdout": "",
-                            "stderr": pod_log,
-                            "submission_status": "FAILED",
-                            "result": "[]",
-                            "metadata": "",
-                        }
-                        response = evalai.update_submission_data(
-                            submission_data, challenge_pk, phase_pk
-                        )
-                        print(response)
-                    except client.rest.ApiException as e:
-                        logger.exception(
-                            "Exception while reading Job logs {}".format(e)
-                        )
+        if (
+            container.name == "agent"
+            and container.state.terminated is not None
+            and container.state.terminated.reason == "Error"
+        ):
+            pod_name = pods_list.items[0].metadata.name
+            try:
+                pod_log_response = core_v1_api_instance.read_namespaced_pod_log(
+                    name=pod_name,
+                    namespace="default",
+                    _return_http_data_only=True,
+                    _preload_content=False,
+                    container="agent",
+                )
+                pod_log = pod_log_response.data.decode("utf-8")
+                submission_data = {
+                    "challenge_phase": phase_pk,
+                    "submission": submission_pk,
+                    "stdout": "",
+                    "stderr": pod_log,
+                    "submission_status": "FAILED",
+                    "result": "[]",
+                    "metadata": "",
+                }
+                response = evalai.update_submission_data(
+                    submission_data, challenge_pk, phase_pk
+                )
+                print(response)
+            except client.rest.ApiException as e:
+                logger.exception(
+                    "Exception while reading Job logs {}".format(e)
+                )
 
 
 def install_gpu_drivers(api_instance):
@@ -329,11 +328,11 @@ def main():
                 core_v1_api_instance = get_core_v1_api_object(
                     cluster_name, cluster_endpoint, challenge, evalai
                 )
-                if (
-                    submission.get("status") == "finished"
-                    or submission.get("status") == "failed"
-                    or submission.get("status") == "cancelled"
-                ):
+                if submission.get("status") in [
+                    "finished",
+                    "failed",
+                    "cancelled",
+                ]:
                     # Fetch the last job name from the list as it is the latest running job
                     job_name = submission.get("job_name")[-1]
                     delete_job(api_instance, job_name)

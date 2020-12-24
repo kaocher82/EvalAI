@@ -70,8 +70,7 @@ class RandomFileName(object):
 def get_model_object(model_name):
     def get_model_by_pk(pk):
         try:
-            model_object = model_name.objects.get(pk=pk)
-            return model_object
+            return model_name.objects.get(pk=pk)
         except model_name.DoesNotExist:
             raise NotFound(
                 "{} {} does not exist".format(model_name.__name__, pk)
@@ -87,20 +86,14 @@ def encode_data(data):
     """
     Turn `data` into a hash and an encoded string, suitable for use with `decode_data`.
     """
-    encoded = []
-    for i in data:
-        encoded.append(base64.encodestring(i).split("=")[0])
-    return encoded
+    return [base64.encodestring(i).split("=")[0] for i in data]
 
 
 def decode_data(data):
     """
     The inverse of `encode_data`.
     """
-    decoded = []
-    for i in data:
-        decoded.append(base64.decodestring(i + "=="))
-    return decoded
+    return [base64.decodestring(i + "==") for i in data]
 
 
 def send_email(
@@ -143,8 +136,7 @@ def get_url_from_hostname(hostname):
         scheme = "http"
     else:
         scheme = "https"
-    url = "{}://{}".format(scheme, hostname)
-    return url
+    return "{}://{}".format(scheme, hostname)
 
 
 def get_boto3_client(resource, aws_keys):
@@ -157,13 +149,12 @@ def get_boto3_client(resource, aws_keys):
         Boto3 client object for the resource
     """
     try:
-        client = boto3.client(
+        return boto3.client(
             resource,
             region_name=aws_keys["AWS_REGION"],
             aws_access_key_id=aws_keys["AWS_ACCESS_KEY_ID"],
             aws_secret_access_key=aws_keys["AWS_SECRET_ACCESS_KEY"],
         )
-        return client
     except Exception as e:
         logger.exception(e)
 
@@ -302,6 +293,4 @@ def is_model_field_changed(model_obj, field_name):
     """
     prev = getattr(model_obj, "_original_{}".format(field_name))
     curr = getattr(model_obj, "{}".format(field_name))
-    if prev != curr:
-        return True
-    return False
+    return prev != curr

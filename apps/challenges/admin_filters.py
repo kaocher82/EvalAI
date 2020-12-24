@@ -8,12 +8,11 @@ class ChallengeFilter(SimpleListFilter):
     parameter_name = "challenge"
 
     def lookups(self, request, model_admin):
-        options = [
+        return [
             ("past", "Past"),
             ("present", "Ongoing"),
             ("future", "Upcoming"),
         ]
-        return options
 
     def queryset(self, request, queryset):
         q_params = {

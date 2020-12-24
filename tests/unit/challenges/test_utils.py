@@ -28,16 +28,14 @@ class BaseTestCase(unittest.TestCase):
         self.assertEqual(test_file_content.decode(), expected)
 
     def test_sqs_queue_name_generator_long_title(self):
-        title = "".join(
-            [random.choice(self.sqs_valid_characters) for i in range(256)]
-        )
+        title = "".join(random.choice(self.sqs_valid_characters) for i in range(256))
         challenge_pk = 1
         sqs_queue_name = get_queue_name(title, challenge_pk)
         self.assertNotRegex(sqs_queue_name, "[^a-zA-Z0-9_-]")
         self.assertLessEqual(len(sqs_queue_name), 80)
 
     def test_sqs_queue_name_generator_title_has_special_char(self):
-        title = "".join([random.choice(string.printable) for i in range(80)])
+        title = "".join(random.choice(string.printable) for i in range(80))
         challenge_pk = 1
         sqs_queue_name = get_queue_name(title, challenge_pk)
         self.assertNotRegex(sqs_queue_name, "[^a-zA-Z0-9_-]")
@@ -46,7 +44,7 @@ class BaseTestCase(unittest.TestCase):
     def test_sqs_queue_name_generator_title_has_special_char_and_long_title(
         self,
     ):
-        title = "".join([random.choice(string.printable) for i in range(256)])
+        title = "".join(random.choice(string.printable) for i in range(256))
         challenge_pk = 1
         sqs_queue_name = get_queue_name(title, challenge_pk)
         self.assertNotRegex(sqs_queue_name, "[^a-zA-Z0-9_-]")

@@ -24,8 +24,7 @@ class EvalAI_Interface:
         self.QUEUE_NAME = QUEUE_NAME
 
     def get_request_headers(self):
-        headers = {"Authorization": "Token {}".format(self.AUTH_TOKEN)}
-        return headers
+        return {"Authorization": "Token {}".format(self.AUTH_TOKEN)}
 
     def make_request(self, url, method, data=None):
         headers = self.get_request_headers()
@@ -49,8 +48,7 @@ class EvalAI_Interface:
     def get_message_from_sqs_queue(self):
         url = URLS.get("get_message_from_sqs_queue").format(self.QUEUE_NAME)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")
 
     def delete_message_from_sqs_queue(self, receipt_handle):
         url = URLS.get("delete_message_from_sqs_queue").format(self.QUEUE_NAME)
@@ -62,51 +60,43 @@ class EvalAI_Interface:
     def get_submission_by_pk(self, submission_pk):
         url = URLS.get("get_submission_by_pk").format(submission_pk)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")
 
     def get_challenge_phases_by_challenge_pk(self, challenge_pk):
         url = URLS.get("get_challenge_phases_by_challenge_pk").format(
             challenge_pk
         )
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")
 
     def get_challenge_by_queue_name(self):
         url = URLS.get("get_challenge_by_queue_name").format(self.QUEUE_NAME)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")
 
     def get_challenge_phase_by_pk(self, challenge_pk, challenge_phase_pk):
         url = URLS.get("get_challenge_phase_by_pk").format(
             challenge_pk, challenge_phase_pk
         )
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")
 
     def update_submission_data(self, data, challenge_pk, submission_pk):
         url = URLS.get("update_submission_data").format(challenge_pk)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "PUT", data=data)
-        return response
+        return self.make_request(url, "PUT", data=data)
 
     def update_submission_status(self, data, challenge_pk):
         url = URLS.get("update_submission_data").format(challenge_pk)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "PATCH", data=data)
-        return response
+        return self.make_request(url, "PATCH", data=data)
 
     def get_aws_eks_bearer_token(self, challenge_pk):
         url = URLS.get("get_aws_eks_bearer_token").format(challenge_pk)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")
 
     def get_aws_eks_cluster_details(self, challenge_pk):
         url = URLS.get("get_aws_eks_cluster_details").format(challenge_pk)
         url = self.return_url_per_environment(url)
-        response = self.make_request(url, "GET")
-        return response
+        return self.make_request(url, "GET")

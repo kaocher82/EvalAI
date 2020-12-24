@@ -326,8 +326,7 @@ def extract_submission_data(submission_pk):
 
 
 def get_request_headers():
-    headers = {"Authorization": "Token {}".format(AUTH_TOKEN)}
-    return headers
+    return {"Authorization": "Token {}".format(AUTH_TOKEN)}
 
 
 def make_request(url, method, data=None):
@@ -396,8 +395,7 @@ def make_request(url, method, data=None):
 def get_message_from_sqs_queue():
     url = URLS.get("get_message_from_sqs_queue").format(QUEUE_NAME)
     url = return_url_per_environment(url)
-    response = make_request(url, "GET")
-    return response
+    return make_request(url, "GET")
 
 
 def delete_message_from_sqs_queue(receipt_handle):
@@ -412,22 +410,19 @@ def delete_message_from_sqs_queue(receipt_handle):
 def get_submission_by_pk(submission_pk):
     url = URLS.get("get_submission_by_pk").format(submission_pk)
     url = return_url_per_environment(url)
-    response = make_request(url, "GET")
-    return response
+    return make_request(url, "GET")
 
 
 def get_challenge_phases_by_challenge_pk(challenge_pk):
     url = URLS.get("get_challenge_phases_by_challenge_pk").format(challenge_pk)
     url = return_url_per_environment(url)
-    response = make_request(url, "GET")
-    return response
+    return make_request(url, "GET")
 
 
 def get_challenge_by_queue_name():
     url = URLS.get("get_challenge_by_queue_name").format(QUEUE_NAME)
     url = return_url_per_environment(url)
-    response = make_request(url, "GET")
-    return response
+    return make_request(url, "GET")
 
 
 def get_challenge_phase_by_pk(challenge_pk, challenge_phase_pk):
@@ -435,22 +430,19 @@ def get_challenge_phase_by_pk(challenge_pk, challenge_phase_pk):
         challenge_pk, challenge_phase_pk
     )
     url = return_url_per_environment(url)
-    response = make_request(url, "GET")
-    return response
+    return make_request(url, "GET")
 
 
 def update_submission_data(data, challenge_pk, submission_pk):
     url = URLS.get("update_submission_data").format(challenge_pk)
     url = return_url_per_environment(url)
-    response = make_request(url, "PUT", data=data)
-    return response
+    return make_request(url, "PUT", data=data)
 
 
 def update_submission_status(data, challenge_pk):
     url = "/api/jobs/challenge/{}/update_submission/".format(challenge_pk)
     url = return_url_per_environment(url)
-    response = make_request(url, "PATCH", data=data)
-    return response
+    return make_request(url, "PATCH", data=data)
 
 
 def read_file_content(file_path):
@@ -511,45 +503,42 @@ def run_submission(
     stderr_file = join(temp_run_dir, "temp_stderr.txt")
 
     stdout = open(stdout_file, "a+")
-    stderr = open(stderr_file, "a+")
-
-    try:
-        logger.info(
-            "Sending submission {} for evaluation".format(submission_pk)
-        )
-        with stdout_redirect(stdout), stderr_redirect(stderr):
-            submission_output = EVALUATION_SCRIPTS[challenge_pk].evaluate(
-                annotation_file_path,
-                user_annotation_file_path,
-                challenge_phase.get("codename"),
-                submission_metadata=submission,
+    with open(stderr_file, "a+") as stderr:
+        try:
+            logger.info(
+                "Sending submission {} for evaluation".format(submission_pk)
             )
-        if remote_evaluation:
+            with stdout_redirect(stdout), stderr_redirect(stderr):
+                submission_output = EVALUATION_SCRIPTS[challenge_pk].evaluate(
+                    annotation_file_path,
+                    user_annotation_file_path,
+                    challenge_phase.get("codename"),
+                    submission_metadata=submission,
+                )
+            if remote_evaluation:
+                return
+        except Exception:
+            status = "failed"
+            stderr.write(traceback.format_exc())
+            stdout.close()
+            stderr.close()
+
+            stdout_content = read_file_content(stdout_file)
+            stderr_content = read_file_content(stderr_file)
+
+            submission_data = {
+                "challenge_phase": phase_pk,
+                "submission": submission_pk,
+                "submission_status": status,
+                "stdout": stdout_content,
+                "stderr": stderr_content,
+            }
+            update_submission_data(submission_data, challenge_pk, submission_pk)
+
+            shutil.rmtree(temp_run_dir)
             return
-    except Exception:
-        status = "failed"
-        stderr.write(traceback.format_exc())
+
         stdout.close()
-        stderr.close()
-
-        stdout_content = read_file_content(stdout_file)
-        stderr_content = read_file_content(stderr_file)
-
-        submission_data = {
-            "challenge_phase": phase_pk,
-            "submission": submission_pk,
-            "submission_status": status,
-            "stdout": stdout_content,
-            "stderr": stderr_content,
-        }
-        update_submission_data(submission_data, challenge_pk, submission_pk)
-
-        shutil.rmtree(temp_run_dir)
-        return
-
-    stdout.close()
-    stderr.close()
-
     stdout_content = read_file_content(stdout_file)
     stderr_content = read_file_content(stderr_file)
 
@@ -567,10 +556,9 @@ def run_submission(
         submission_data["metadata"] = json.dumps(
             submission_output.get("submission_metadata")
         )
-        submission_data["submission_status"] = status
     else:
         status = "failed"
-        submission_data["submission_status"] = status
+    submission_data["submission_status"] = status
     update_submission_data(submission_data, challenge_pk, submission_pk)
     shutil.rmtree(temp_run_dir)
     return

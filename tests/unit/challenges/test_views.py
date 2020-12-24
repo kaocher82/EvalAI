@@ -2171,7 +2171,7 @@ class CreateChallengePhaseTest(BaseChallengePhaseClass):
             id_field = zipTestPhase._meta.get_field("name")
             id_val = id_field.value_from_object(zipTestPhase)
             if id_val == "Challenge Name of the challenge phase":
-                self.assertTrue(max_per_month == 1000 or max_per_month == 345)
+                self.assertTrue(max_per_month in [1000, 345])
 
     def test_max_submissions_per_month_if_field_doesnt_exist(self):
         self.zip_file = open(
@@ -3309,10 +3309,7 @@ class GetAllSubmissionsTest(BaseAPITestClass):
         )
         self.client.force_authenticate(user=self.user5)
         submissions = [self.submission3, self.submission2]
-        expected = []
-        for submission in submissions:
-            expected.append(
-                {
+        expected = [{
                     "id": submission.id,
                     "participant_team": submission.participant_team.team_name,
                     "challenge_phase": submission.challenge_phase.name,
@@ -3339,8 +3336,7 @@ class GetAllSubmissionsTest(BaseAPITestClass):
                     "created_at": submission.created_at,
                     "method_name": submission.method_name,
                     "submission_metadata": None,
-                }
-            )
+                } for submission in submissions]
         response_phase1 = self.client.get(self.url_phase1, {})
         response_phase2 = self.client.get(self.url_phase2, {})
         self.assertEqual(response_phase1.data["results"], expected)

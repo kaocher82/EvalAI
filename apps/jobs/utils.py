@@ -326,11 +326,13 @@ def calculate_distinct_sorted_leaderboard_data(
         "submission__id",
         "submission__submission_metadata",
     )
-    if only_public_entries:
-        if challenge_phase_split.visibility == ChallengePhaseSplit.PUBLIC:
-            leaderboard_data = leaderboard_data.filter(
-                submission__is_public=True
-            )
+    if (
+        only_public_entries
+        and challenge_phase_split.visibility == ChallengePhaseSplit.PUBLIC
+    ):
+        leaderboard_data = leaderboard_data.filter(
+            submission__is_public=True
+        )
 
     all_banned_participant_team = []
     for leaderboard_item in leaderboard_data:
@@ -357,10 +359,11 @@ def calculate_distinct_sorted_leaderboard_data(
                 float(k["filtering_score"]),
                 float(-k["filtering_error"]),
             ),
-            reverse=True
-            if challenge_phase_split.is_leaderboard_order_descending
-            else False,
+            reverse=bool(
+                challenge_phase_split.is_leaderboard_order_descending
+            ),
         )
+
 
     distinct_sorted_leaderboard_data = []
     team_list = []
@@ -408,11 +411,10 @@ def get_leaderboard_data_model(submission_pk, challenge_phase_split_pk):
         Returns:
             [Class Object] -- LeaderboardData model object
     """
-    leaderboard_data = LeaderboardData.objects.get(
+    return LeaderboardData.objects.get(
         submission=submission_pk,
         challenge_phase_split__pk=challenge_phase_split_pk,
     )
-    return leaderboard_data
 
 
 def reorder_submissions_comparator(submission_1, submission_2):

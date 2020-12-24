@@ -220,10 +220,7 @@ def create_dir_as_python_package(directory):
 
 
 def return_file_url_per_environment(url):
-    if (
-        DJANGO_SETTINGS_MODULE == "settings.dev"
-        or DJANGO_SETTINGS_MODULE == "settings.test"
-    ):
+    if DJANGO_SETTINGS_MODULE in ["settings.dev", "settings.test"]:
         base_url = (
             f"http://{settings.DJANGO_SERVER}:{settings.DJANGO_SERVER_PORT}"
         )
@@ -387,64 +384,63 @@ def run_submission(
     stdout_file = join(temp_run_dir, "temp_stdout.txt")
     stderr_file = join(temp_run_dir, "temp_stderr.txt")
 
-    stdout = open(stdout_file, "a+")
-    stderr = open(stderr_file, "a+")
+    with open(stdout_file, "a+") as stdout:
+        with open(stderr_file, "a+") as stderr:
+            remote_evaluation = submission.challenge_phase.challenge.remote_evaluation
 
-    remote_evaluation = submission.challenge_phase.challenge.remote_evaluation
+            if remote_evaluation:
+                try:
+                    logger.info(
+                        "{} Sending submission {} for remote evaluation".format(
+                            SUBMISSION_LOGS_PREFIX,
+                            submission.id
+                        )
+                    )
+                    with stdout_redirect(stdout) as new_stdout, stderr_redirect(
+                        stderr
+                    ) as new_stderr:
+                        submission_output = EVALUATION_SCRIPTS[challenge_id].evaluate(
+                            annotation_file_path,
+                            user_annotation_file_path,
+                            challenge_phase.codename,
+                            submission_metadata=submission_serializer.data,
+                        )
+                        return
+                except Exception:
+                    stderr.write(traceback.format_exc())
+                    stderr.close()
+                    stdout.close()
+                    submission.status = Submission.FAILED
+                    submission.completed_at = timezone.now()
+                    submission.save()
+                    with open(stdout_file, "r") as stdout:
+                        stdout_content = stdout.read()
+                        submission.stdout_file.save(
+                            "stdout.txt", ContentFile(stdout_content)
+                        )
+                    with open(stderr_file, "r") as stderr:
+                        stderr_content = stderr.read()
+                        submission.stderr_file.save(
+                            "stderr.txt", ContentFile(stderr_content)
+                        )
 
-    if remote_evaluation:
-        try:
-            logger.info(
-                "{} Sending submission {} for remote evaluation".format(
-                    SUBMISSION_LOGS_PREFIX,
-                    submission.id
-                )
-            )
-            with stdout_redirect(stdout) as new_stdout, stderr_redirect(
-                stderr
-            ) as new_stderr:
-                submission_output = EVALUATION_SCRIPTS[challenge_id].evaluate(
-                    annotation_file_path,
-                    user_annotation_file_path,
-                    challenge_phase.codename,
-                    submission_metadata=submission_serializer.data,
-                )
-                return
-        except Exception:
-            stderr.write(traceback.format_exc())
-            stderr.close()
-            stdout.close()
-            submission.status = Submission.FAILED
-            submission.completed_at = timezone.now()
-            submission.save()
-            with open(stdout_file, "r") as stdout:
-                stdout_content = stdout.read()
-                submission.stdout_file.save(
-                    "stdout.txt", ContentFile(stdout_content)
-                )
-            with open(stderr_file, "r") as stderr:
-                stderr_content = stderr.read()
-                submission.stderr_file.save(
-                    "stderr.txt", ContentFile(stderr_content)
-                )
+                    # delete the complete temp run directory
+                    shutil.rmtree(temp_run_dir)
+                    return
 
-            # delete the complete temp run directory
-            shutil.rmtree(temp_run_dir)
-            return
-
-    # call `main` from globals and set `status` to running and hence `started_at`
-    try:
-        successful_submission_flag = True
-        with stdout_redirect(stdout) as new_stdout, stderr_redirect(  # noqa
-            stderr
-        ) as new_stderr:  # noqa
-            submission_output = EVALUATION_SCRIPTS[challenge_id].evaluate(
-                annotation_file_path,
-                user_annotation_file_path,
-                challenge_phase.codename,
-                submission_metadata=submission_serializer.data,
-            )
-        """
+                # call `main` from globals and set `status` to running and hence `started_at`
+            try:
+                successful_submission_flag = True
+                with stdout_redirect(stdout) as new_stdout, stderr_redirect(  # noqa
+                    stderr
+                ) as new_stderr:  # noqa
+                    submission_output = EVALUATION_SCRIPTS[challenge_id].evaluate(
+                        annotation_file_path,
+                        user_annotation_file_path,
+                        challenge_phase.codename,
+                        submission_metadata=submission_serializer.data,
+                    )
+                """
         A submission will be marked successful only if it is of the format
             {
                "result":[
@@ -472,106 +468,103 @@ def run_submission(
             }
         """
 
-        error_bars_dict = dict()
-        if "error" in submission_output:
-            for split_error in submission_output["error"]:
-                split_code_name = list(split_error.keys())[0]
-                error_bars_dict[split_code_name] = split_error[split_code_name]
-
-        if "result" in submission_output:
-
-            leaderboard_data_list = []
-            for split_result in submission_output["result"]:
-                # get split_code_name that is the key of the result
-                split_code_name = list(split_result.keys())[0]
-
-                # Check if the challenge_phase_split exists for the challenge_phaseand dataset_split
-                try:
-                    challenge_phase_split = ChallengePhaseSplit.objects.get(
-                        challenge_phase=challenge_phase,
-                        dataset_split__codename=split_code_name,
-                    )
-                except Exception:
-                    stderr.write(
-                        "ORGINIAL EXCEPTION: No such relation between Challenge Phase and DatasetSplit"
-                        " specified by Challenge Host \n"
-                    )
-                    stderr.write(traceback.format_exc())
-                    successful_submission_flag = False
-                    break
-
-                # Check if the dataset_split exists for the codename in the result
-                try:
-                    dataset_split = challenge_phase_split.dataset_split
-                except Exception:
-                    stderr.write(
-                        "ORGINIAL EXCEPTION: The codename specified by your Challenge Host doesn't match"
-                        " with that in the evaluation Script.\n"
-                    )
-                    stderr.write(traceback.format_exc())
-                    successful_submission_flag = False
-                    break
-
-                leaderboard_data = LeaderboardData()
-                leaderboard_data.challenge_phase_split = challenge_phase_split
-                leaderboard_data.submission = submission
-                leaderboard_data.leaderboard = (
-                    challenge_phase_split.leaderboard
-                )
-                leaderboard_data.result = split_result.get(
-                    dataset_split.codename
-                )
-
+                error_bars_dict = {}
                 if "error" in submission_output:
-                    leaderboard_data.error = error_bars_dict.get(
-                        dataset_split.codename
-                    )
+                    for split_error in submission_output["error"]:
+                        split_code_name = list(split_error.keys())[0]
+                        error_bars_dict[split_code_name] = split_error[split_code_name]
 
-                leaderboard_data_list.append(leaderboard_data)
+                if "result" in submission_output:
 
-            if successful_submission_flag:
-                LeaderboardData.objects.bulk_create(leaderboard_data_list)
+                    leaderboard_data_list = []
+                    for split_result in submission_output["result"]:
+                        # get split_code_name that is the key of the result
+                        split_code_name = list(split_result.keys())[0]
 
-        # Once the submission_output is processed, then save the submission object with appropriate status
-        else:
-            successful_submission_flag = False
+                        # Check if the challenge_phase_split exists for the challenge_phaseand dataset_split
+                        try:
+                            challenge_phase_split = ChallengePhaseSplit.objects.get(
+                                challenge_phase=challenge_phase,
+                                dataset_split__codename=split_code_name,
+                            )
+                        except Exception:
+                            stderr.write(
+                                "ORGINIAL EXCEPTION: No such relation between Challenge Phase and DatasetSplit"
+                                " specified by Challenge Host \n"
+                            )
+                            stderr.write(traceback.format_exc())
+                            successful_submission_flag = False
+                            break
 
-    except Exception:
-        stderr.write(traceback.format_exc())
-        successful_submission_flag = False
+                        # Check if the dataset_split exists for the codename in the result
+                        try:
+                            dataset_split = challenge_phase_split.dataset_split
+                        except Exception:
+                            stderr.write(
+                                "ORGINIAL EXCEPTION: The codename specified by your Challenge Host doesn't match"
+                                " with that in the evaluation Script.\n"
+                            )
+                            stderr.write(traceback.format_exc())
+                            successful_submission_flag = False
+                            break
 
-    submission_status = (
-        Submission.FINISHED
-        if successful_submission_flag
-        else Submission.FAILED
-    )
-    submission.status = submission_status
-    submission.completed_at = timezone.now()
-    submission.save()
+                        leaderboard_data = LeaderboardData()
+                        leaderboard_data.challenge_phase_split = challenge_phase_split
+                        leaderboard_data.submission = submission
+                        leaderboard_data.leaderboard = (
+                            challenge_phase_split.leaderboard
+                        )
+                        leaderboard_data.result = split_result.get(
+                            dataset_split.codename
+                        )
 
-    # after the execution is finished, set `status` to finished and hence `completed_at`
-    if submission_output:
-        output = {}
-        output["result"] = submission_output.get("result", "")
-        submission.output = output
+                        if "error" in submission_output:
+                            leaderboard_data.error = error_bars_dict.get(
+                                dataset_split.codename
+                            )
 
-        # Save submission_result_file
-        submission_result = submission_output.get("submission_result", "")
-        submission_result = json.dumps(submission_result)
-        submission.submission_result_file.save(
-            "submission_result.json", ContentFile(submission_result)
-        )
+                        leaderboard_data_list.append(leaderboard_data)
 
-        # Save submission_metadata_file
-        submission_metadata = submission_output.get("submission_metadata", "")
-        submission.submission_metadata_file.save(
-            "submission_metadata.json", ContentFile(submission_metadata)
-        )
+                    if successful_submission_flag:
+                        LeaderboardData.objects.bulk_create(leaderboard_data_list)
 
-    submission.save()
+                # Once the submission_output is processed, then save the submission object with appropriate status
+                else:
+                    successful_submission_flag = False
 
-    stderr.close()
-    stdout.close()
+            except Exception:
+                stderr.write(traceback.format_exc())
+                successful_submission_flag = False
+
+            submission_status = (
+                Submission.FINISHED
+                if successful_submission_flag
+                else Submission.FAILED
+            )
+            submission.status = submission_status
+            submission.completed_at = timezone.now()
+            submission.save()
+
+                # after the execution is finished, set `status` to finished and hence `completed_at`
+            if submission_output:
+                output = {"result": submission_output.get("result", "")}
+                submission.output = output
+
+                # Save submission_result_file
+                submission_result = submission_output.get("submission_result", "")
+                submission_result = json.dumps(submission_result)
+                submission.submission_result_file.save(
+                    "submission_result.json", ContentFile(submission_result)
+                )
+
+                # Save submission_metadata_file
+                submission_metadata = submission_output.get("submission_metadata", "")
+                submission.submission_metadata_file.save(
+                    "submission_metadata.json", ContentFile(submission_metadata)
+                )
+
+            submission.save()
+
     stderr_content = open(stderr_file, "r").read()
     stdout_content = open(stdout_file, "r").read()
 
@@ -641,7 +634,7 @@ def process_submission_callback(body):
     try:
         logger.info("{} [x] Received submission message {}" .format(SUBMISSION_LOGS_PREFIX, body))
         body = yaml.safe_load(body)
-        body = dict((k, int(v)) for k, v in body.items())
+        body = {k: int(v) for k, v in body.items()}
         process_submission_message(body)
     except Exception as e:
         logger.exception(
@@ -710,8 +703,7 @@ def main():
     create_dir_as_python_package(COMPUTE_DIRECTORY_PATH)
     sys.path.append(COMPUTE_DIRECTORY_PATH)
 
-    q_params = {"approved_by_admin": True}
-    q_params["start_date__lt"] = timezone.now()
+    q_params = {"approved_by_admin": True, "start_date__lt": timezone.now()}
     q_params["end_date__gt"] = timezone.now()
 
     challenge_pk = os.environ.get("CHALLENGE_PK")
@@ -745,25 +737,20 @@ def main():
     queue = get_or_create_sqs_queue(queue_name)
     while True:
         for message in queue.receive_messages():
-            if settings.DEBUG or settings.TEST:
-                if eval(LIMIT_CONCURRENT_SUBMISSION_PROCESSING):
-                    current_running_submissions_count = Submission.objects.filter(
-                        challenge_phase__challenge=challenge.id,
-                        status="running",
-                    ).count()
-                    if (
-                        current_running_submissions_count
-                        == maximum_concurrent_submissions
-                    ):
-                        pass
-                    else:
-                        logger.info(
-                            "{} Processing message body: {}".format(WORKER_LOGS_PREFIX, message.body)
-                        )
-                        process_submission_callback(message.body)
-                        # Let the queue know that the message is processed
-                        message.delete()
-                else:
+            if (
+                (settings.DEBUG or settings.TEST)
+                and eval(LIMIT_CONCURRENT_SUBMISSION_PROCESSING)
+                or not settings.DEBUG
+                and not settings.TEST
+            ):
+                current_running_submissions_count = Submission.objects.filter(
+                    challenge_phase__challenge=challenge.id,
+                    status="running",
+                ).count()
+                if (
+                    current_running_submissions_count
+                    != maximum_concurrent_submissions
+                ):
                     logger.info(
                         "{} Processing message body: {}".format(WORKER_LOGS_PREFIX, message.body)
                     )
@@ -771,21 +758,12 @@ def main():
                     # Let the queue know that the message is processed
                     message.delete()
             else:
-                current_running_submissions_count = Submission.objects.filter(
-                    challenge_phase__challenge=challenge.id, status="running"
-                ).count()
-                if (
-                    current_running_submissions_count
-                    == maximum_concurrent_submissions
-                ):
-                    pass
-                else:
-                    logger.info(
-                        "{} Processing message body: {}".format(WORKER_LOGS_PREFIX, message.body)
-                    )
-                    process_submission_callback(message.body)
-                    # Let the queue know that the message is processed
-                    message.delete()
+                logger.info(
+                    "{} Processing message body: {}".format(WORKER_LOGS_PREFIX, message.body)
+                )
+                process_submission_callback(message.body)
+                # Let the queue know that the message is processed
+                message.delete()
         if killer.kill_now:
             break
         time.sleep(0.1)

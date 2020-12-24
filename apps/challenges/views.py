@@ -232,17 +232,16 @@ def challenge_detail(request, challenge_host_team_pk, challenge_pk):
                     "request": request,
                 },
             )
-        if serializer.is_valid():
-            serializer.save()
-            challenge = get_challenge_model(serializer.instance.pk)
-            serializer = ChallengeSerializer(challenge)
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
+        if not serializer.is_valid():
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+        serializer.save()
+        challenge = get_challenge_model(serializer.instance.pk)
+        serializer = ChallengeSerializer(challenge)
+        response_data = serializer.data
+        return Response(response_data, status=status.HTTP_200_OK)
     elif request.method == "DELETE":
         challenge.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -296,17 +295,18 @@ def add_participant_team_to_challenge(
 
     # Check if user is in allowed list.
     user_email = request.user.email
-    if len(challenge.allowed_email_domains) > 0:
-        if not is_user_in_allowed_email_domains(user_email, challenge_pk):
-            message = "Sorry, users with {} email domain(s) are only allowed to participate in this challenge."
-            domains = ""
-            for domain in challenge.allowed_email_domains:
-                domains = "{}{}{}".format(domains, "/", domain)
-            domains = domains[1:]
-            response_data = {"error": message.format(domains)}
-            return Response(
-                response_data, status=status.HTTP_406_NOT_ACCEPTABLE
-            )
+    if len(
+        challenge.allowed_email_domains
+    ) > 0 and not is_user_in_allowed_email_domains(user_email, challenge_pk):
+        message = "Sorry, users with {} email domain(s) are only allowed to participate in this challenge."
+        domains = ""
+        for domain in challenge.allowed_email_domains:
+            domains = "{}{}{}".format(domains, "/", domain)
+        domains = domains[1:]
+        response_data = {"error": message.format(domains)}
+        return Response(
+            response_data, status=status.HTTP_406_NOT_ACCEPTABLE
+        )
 
     # Check if user is in blocked list.
     if is_user_in_blocked_email_domains(user_email, challenge_pk):
@@ -600,17 +600,14 @@ def challenge_phase_detail(request, challenge_pk, pk):
         return Response(response_data, status=status.HTTP_406_NOT_ACCEPTABLE)
 
     if request.method == "GET":
-        if not is_user_a_host_of_challenge(request.user, challenge.id):
-            serializer = ChallengePhaseSerializer(challenge_phase)
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
+        if is_user_a_host_of_challenge(request.user, challenge.id):
             serializer = ChallengePhaseCreateSerializer(
                 challenge_phase, context={"request": request}
             )
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-
+        else:
+            serializer = ChallengePhaseSerializer(challenge_phase)
+        response_data = serializer.data
+        return Response(response_data, status=status.HTTP_200_OK)
     elif request.method in ["PUT", "PATCH"]:
         if request.method == "PATCH":
             serializer = ChallengePhaseCreateSerializer(
@@ -625,17 +622,16 @@ def challenge_phase_detail(request, challenge_pk, pk):
                 data=request.data.copy(),
                 context={"challenge": challenge},
             )
-        if serializer.is_valid():
-            serializer.save()
-            challenge_phase = get_challenge_phase_model(serializer.instance.pk)
-            serializer = ChallengePhaseSerializer(challenge_phase)
-            response_data = serializer.data
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
+        if not serializer.is_valid():
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+        serializer.save()
+        challenge_phase = get_challenge_phase_model(serializer.instance.pk)
+        serializer = ChallengePhaseSerializer(challenge_phase)
+        response_data = serializer.data
+        return Response(response_data, status=status.HTTP_200_OK)
     elif request.method == "DELETE":
         challenge_phase.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

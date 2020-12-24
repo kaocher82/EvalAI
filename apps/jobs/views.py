@@ -212,14 +212,16 @@ def challenge_submission(request, challenge_id, challenge_phase_id):
                 )
 
             # if allowed email ids list exist, check if the user exist in that list or not
-            if challenge_phase.allowed_email_ids:
-                if request.user.email not in challenge_phase.allowed_email_ids:
-                    response_data = {
-                        "error": "Sorry, you are not allowed to participate in this challenge phase"
-                    }
-                    return Response(
-                        response_data, status=status.HTTP_403_FORBIDDEN
-                    )
+            if (
+                challenge_phase.allowed_email_ids
+                and request.user.email not in challenge_phase.allowed_email_ids
+            ):
+                response_data = {
+                    "error": "Sorry, you are not allowed to participate in this challenge phase"
+                }
+                return Response(
+                    response_data, status=status.HTTP_403_FORBIDDEN
+                )
 
         participant_team_id = get_participant_team_id_of_user_for_a_challenge(
             request.user, challenge_id
@@ -434,12 +436,12 @@ def change_submission_data_and_visibility(
         partial=True,
     )
 
-    if serializer.is_valid():
-        serializer.save()
-        response_data = serializer.data
-        return Response(response_data, status=status.HTTP_200_OK)
-    else:
+    if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer.save()
+    response_data = serializer.data
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @swagger_auto_schema(
@@ -644,7 +646,7 @@ def get_remaining_submissions(request, challenge_pk):
         challenge_phases = challenge_phases.filter(
             challenge=challenge, is_public=True
         ).order_by("pk")
-    phase_data_list = list()
+    phase_data_list = []
     for phase in challenge_phases:
         (
             remaining_submission_message,
@@ -885,9 +887,7 @@ def update_submission(request, challenge_pk):
         submission = get_submission_model(submission_pk)
 
         public_results = []
-        successful_submission = (
-            True if submission_status == Submission.FINISHED else False
-        )
+        successful_submission = submission_status == Submission.FINISHED
         if submission_status not in [
             Submission.FAILED,
             Submission.CANCELLED,
@@ -938,9 +938,7 @@ def update_submission(request, challenge_pk):
                     if metric not in leaderboard_metrics:
                         missing_metrics.append(metric)
 
-                    if not (
-                        isinstance(value, float) or isinstance(value, int)
-                    ):
+                    if not isinstance(value, (float, int)):
                         malformed_metrics.append((metric, type(value)))
 
                 if len(missing_metrics):
@@ -1221,14 +1219,11 @@ def update_partially_evaluated_submission(request, challenge_pk):
         submission = get_submission_model(submission_pk)
 
         public_results = []
-        successful_submission = (
-            True
-            if (
-                submission_status == Submission.FINISHED
-                or submission_status == Submission.PARTIALLY_EVALUATED
-            )
-            else False
-        )
+        successful_submission = submission_status in [
+            Submission.FINISHED,
+            Submission.PARTIALLY_EVALUATED,
+        ]
+
         if submission_status not in [
             Submission.FAILED,
             Submission.CANCELLED,
@@ -1280,9 +1275,7 @@ def update_partially_evaluated_submission(request, challenge_pk):
                     if metric not in leaderboard_metrics:
                         missing_metrics.append(metric)
 
-                    if not (
-                        isinstance(value, float) or isinstance(value, int)
-                    ):
+                    if not isinstance(value, (float, int)):
                         malformed_metrics.append((metric, type(value)))
 
                 is_partial_evaluation_phase = (
@@ -1391,17 +1384,16 @@ def update_partially_evaluated_submission(request, challenge_pk):
                 partial=True,
                 context={"request": request},
             )
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
+            if not serializer.is_valid():
                 return Response(
                     serializer.errors, status=status.HTTP_400_BAD_REQUEST
                 )
-        elif (
-            submission_status == Submission.PARTIALLY_EVALUATED
-            or submission_status == Submission.FINISHED
-        ):
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        elif submission_status in [
+            Submission.PARTIALLY_EVALUATED,
+            Submission.FINISHED,
+        ]:
             challenge_phase_pk = request.data.get("challenge_phase")
             stdout_content = request.data.get("stdout", "")
             stderr_content = request.data.get("stderr", "")
@@ -1465,9 +1457,7 @@ def update_partially_evaluated_submission(request, challenge_pk):
                     if metric not in leaderboard_metrics:
                         missing_metrics.append(metric)
 
-                    if not (
-                        isinstance(value, float) or isinstance(value, int)
-                    ):
+                    if not isinstance(value, (float, int)):
                         malformed_metrics.append((metric, type(value)))
                     updated_result[metric] = value
 
@@ -1937,18 +1927,17 @@ def update_leaderboard_data(request, leaderboard_data_pk):
         }
         return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
     leaderboard_metrics = leaderboard_data.leaderboard.schema.get("labels")
-    missing_metrics = []
     extra_metrics = []
     malformed_metrics = []
-    for metric in leaderboard_metrics:
-        if metric not in data:
-            missing_metrics.append(metric)
+    missing_metrics = [
+        metric for metric in leaderboard_metrics if metric not in data
+    ]
 
     for metric, value in data.items():
         if metric not in leaderboard_metrics:
             extra_metrics.append(metric)
 
-        if not (isinstance(value, float) or isinstance(value, int)):
+        if not isinstance(value, (float, int)):
             malformed_metrics.append((metric, type(value)))
 
     if len(missing_metrics) and len(extra_metrics):
@@ -2184,14 +2173,16 @@ def get_submission_file_presigned_url(request, challenge_phase_pk):
             )
 
         # if allowed email ids list exist, check if the user exist in that list or not
-        if challenge_phase.allowed_email_ids:
-            if request.user.email not in challenge_phase.allowed_email_ids:
-                response_data = {
-                    "error": "Sorry, you are not allowed to participate in this challenge phase"
-                }
-                return Response(
-                    response_data, status=status.HTTP_403_FORBIDDEN
-                )
+        if (
+            challenge_phase.allowed_email_ids
+            and request.user.email not in challenge_phase.allowed_email_ids
+        ):
+            response_data = {
+                "error": "Sorry, you are not allowed to participate in this challenge phase"
+            }
+            return Response(
+                response_data, status=status.HTTP_403_FORBIDDEN
+            )
 
     participant_team_id = get_participant_team_id_of_user_for_a_challenge(
         request.user, challenge.pk
@@ -2323,14 +2314,16 @@ def send_submission_message(request, challenge_phase_pk, submission_pk):
                 response_data, status=status.HTTP_406_NOT_ACCEPTABLE
             )
 
-        if challenge_phase.allowed_email_ids:
-            if request.user.email not in challenge_phase.allowed_email_ids:
-                response_data = {
-                    "error": "Sorry, you are not allowed to participate in this challenge phase"
-                }
-                return Response(
-                    response_data, status=status.HTTP_403_FORBIDDEN
-                )
+        if (
+            challenge_phase.allowed_email_ids
+            and request.user.email not in challenge_phase.allowed_email_ids
+        ):
+            response_data = {
+                "error": "Sorry, you are not allowed to participate in this challenge phase"
+            }
+            return Response(
+                response_data, status=status.HTTP_403_FORBIDDEN
+            )
 
     participant_team_id = get_participant_team_id_of_user_for_a_challenge(
         request.user, challenge.pk

@@ -17,7 +17,7 @@ def make_team_name_unique():
                     participant_team.team_name, participant_team_iter
                 )
                 participant_team.save()
-                participant_team_iter = participant_team_iter + 1
+                participant_team_iter += 1
             else:
                 participant_team_list.append(participant_team.team_name)
     except Exception as e:
@@ -32,7 +32,7 @@ def make_team_name_unique():
                     host_team.team_name, host_team_iter
                 )
                 host_team.save()
-                host_team_iter = host_team_iter + 1
+                host_team_iter += 1
             else:
                 host_team_list.append(host_team.team_name)
     except Exception as e:

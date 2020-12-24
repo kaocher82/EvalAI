@@ -150,11 +150,7 @@ class Submission(TimeStampedModel):
                 challenge_phase=self.challenge_phase,
                 participant_team=self.participant_team,
             ).aggregate(Max("submission_number"))["submission_number__max"]
-            if sub_num:
-                self.submission_number = sub_num + 1
-            else:
-                self.submission_number = 1
-
+            self.submission_number = sub_num + 1 if sub_num else 1
             submissions = Submission.objects.filter(
                 challenge_phase=self.challenge_phase,
                 participant_team=self.participant_team,
@@ -248,11 +244,8 @@ class Submission(TimeStampedModel):
                     }
                 )
 
-            self.is_public = (
-                True if self.challenge_phase.is_submission_public else False
-            )
+            self.is_public = bool(self.challenge_phase.is_submission_public)
 
             self.status = Submission.SUBMITTED
 
-        submission_instance = super(Submission, self).save(*args, **kwargs)
-        return submission_instance
+        return super(Submission, self).save(*args, **kwargs)
